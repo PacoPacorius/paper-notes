@@ -1,2 +1,31 @@
-*** Notes on ARM's MTE ***
+=== Notes on ARM's MTE ===
 
+Introduction
+* MTE tries to detect spatial and temporal memory violations. 
+
+Threat Model
+* MTE tries to subvert malicious data only.
+* In dynamically linked systems, legacy code doesn't need recompilation
+* MTE assumes stack pointer is trustworthy. Application to the stack requires
+    recompilation.
+
+Memory Safety
+* 4 bits of data for every 16 bytes. Pointers (virtual addresses) are the 
+key to the lock. 
+* Sequential allocations have different tags, but eventually a tag is going
+to be repeated.
+
+Architectural Details
+* Tag in the top byte of the address register is compared with the tag 
+stored in memory.
+* Exception can be both synchronous and asynchronous.
+
+Deployment in both HW and SW
+* Modifications are required in OS Kernel and C libraries for heap tagging 
+    in dynamically-linked systems.
+* Stack support requires extra recompilation. 
+* In either case, no source code modification is required.
+
+
+=== Summary ===
+Essentially more of a hybrid hardware-software solution?
