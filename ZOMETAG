@@ -1,0 +1,36 @@
+▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊
+▊▊▊ ZOMETAG ▊▊▊
+▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊
+
+*** I. Intro ***
+
+* Our problem is dereferencing a pointer that points outside its referenced
+    object. Bounds Checking is security verified but has a severe performance 
+    overhead.
+
+* Tagged Memory Architecture takes advantage of hardware acceleration. In
+    comparison, much more low-cost in terms of performance while still 
+    being as fine-grained as BC. Tag coloring = assigning a tag to a 
+    pointer/object. Tagm matching = tag compare
+
+* ARM's and SPARC's modern solutions MTE and ADI offer only 16 tag colors for
+    every 16 bytes. Inevitably different objects will be assigned the same 
+    color. 1/16 chance to not detect memory violation!
+
+* ZOMETAG suggests memory regions called zones to combat the tag color 
+    shortage problem of MTE. Tags in the same zone can't have the same tag 
+    color. MTE only assigns the tag. Is zone assigned in software?
+
+* Enforcing zone-based isolation requires pointer offset not to exceed
+    zone boundaries. Up to implementation. 
+
+* Implementation in paper: separate every program address space to blue and red 
+    zone alternately in a row. No access allowed in red zones, reserved for
+    location-based violation checking.
+
+* Memory breaches from blue to red zones are detected by checking a single 
+    bit!
+
+
+*** II. Background ***
+
