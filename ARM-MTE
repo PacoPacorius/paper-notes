@@ -18,7 +18,14 @@ to be repeated.
 Architectural Details
 * Tag in the top byte of the address register is compared with the tag 
 stored in memory.
-* Exception can be both synchronous and asynchronous.
+* Exception can be both synchronous and asynchronous. 
+    - Synchrounous tag fault exceptions can exactly pinpoint which load/store 
+    instruction caused the exception. This requires higher overhead.
+    To be used in pre-release testing to sort out any issues, will
+    accumulate data on tag mismatches.
+    - Asynchronous tag fault exceptions can pinpoint which thread caused 
+    exception (less accurate) but incurs less overhead. To be used 
+    after release. Tag mismatches terminates process.
 
 Deployment in both HW and SW
 * Modifications are required in OS Kernel and C libraries for heap tagging 

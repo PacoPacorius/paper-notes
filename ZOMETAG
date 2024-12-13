@@ -34,3 +34,17 @@
 
 *** II. Background ***
 
+* ZOMETAG is based on ARM MTE's imprecise mode.
+
+
+
+
+*** III. Threat Model And Assumptions ***
+
+* ZOMETAG provides spatial safety at the granularity of objects, it ingnores
+    sub-object spatial errors. (Code-injection, use-after-free, type-confusion 
+    and hammering are not considered)
+
+
+
+
