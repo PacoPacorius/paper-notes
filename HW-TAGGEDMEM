@@ -1,0 +1,136 @@
+== Hardware Enforcement Of Application Security Policies Using Tagged Memory ==
+* computers are insecure because of ad-hoc security mechanisms not supported
+    by hardware or kernel
+* LoStar, new architecture, where it is the hardware's job to manage read 
+    and write access, kernel is there to minimize "covert channels"
+* memory has tags, a security monitor that runs underneath the kernel manages
+    them. Tags allow specifying specific security policies unambiguously
+    at hardware level with a very small trusted code base.
+* problem! malicious process can provide secret bits to non-secret 
+    applications! kernel and hardware fixes both very complex!
+* High and low security divide. We keep compatibility with standard UNIX 
+    applications. For LoStar apps, two different sets of low data need to
+    be compromised, kernel compromisation achieves nothing because tagged 
+    memory is in hardware level.
+* Every 32-bit word has a 32-bit tag associated with it. Tag checks happen
+    on the processor on every instruction fetch, load, store. Kernel cannot
+    modify tags itself! It calls upon the security monitor!
+
+* There is a separate data category for every process and only threads in 
+    that process can access the process's address space.
+* We enforce memory access control but not liveness! Malicious kernel code
+    can execute a DOS attack!
+
+* IDs are confusing (pg. 5, 3.2)
+* A thread can change its label dynamically during runtime, but can only add
+    certain restrictions, it cannot remove any. Thread label changes are 
+    checked by the security monitor. Discretionary access control.
+* Kernel is responsible to prohibit malicious code from exporting secret
+    data outside the system. There is a separate logical instance of a 
+    kernel for each thread. The security monitor protects each kernel 
+    instance from each other with labels. Compromising a kernel instance
+    has minimal consequences compared to a global kernel.
+* Tags: hardware-level, Loki feature
+  Labels: kernel-level, HiStar feature
+    security monitor in Loki maps labels with tags, 
+    tags <- security monitor -> labels
+* Security monitor ensures security of kernel object IDs. Attackers cannot 
+    substitute objects with other objects with the same ID, nor can they
+    change the type of an object. Kernel objects are also tagged with IDs,
+    an attacker cannot trick another kernel into accessing a kernel object
+    of the wrong type. They can do denial-of-service but not data 
+    corruption!
+
+3.5
+* Kernel can call the monitor API by accessing a monitor call word (but 
+    the monitor call tag the word is tagged with cannot be accessed by kernel
+    code? how does that work). 
+
+3.6 Interrupts
+* Traditional CPU exceptions and tag exceptions. CPU interrupts are handled
+    by the current thread which decides whether to hand them off to another
+    protection domain or to stay in the current domain.
+* Tag exceptions put the cpu in monitor mode. the tag exception handler
+    needs to implement its own traditional exception handlers, but they 
+    don't need to be any different than the non-monitor mode ones.
+
+3.7 Devices
+* Device handling code is part of the trusted security monitor.
+
+4.1 Memory tagging
+* Tags are associated with physical (not virtual) memory addresses! Tags are
+    stored in shadow pages, where every 32-bit tag corresponds to a 32-bit
+    word in the original page, and the 32-bit addresses of the shadow pages 
+    are stored in the linear page-tag array. This array is indexed by the
+    page numbers.
+
+4.2 Permissions cache
+* P-cache stores a tag and 3 bits (read, write, execute) for each tag.
+    P-cache width turns out to be more important than size!
+
+4.3 Tag exceptions
+* We do not want exception handlers that rely on page tables and registers
+    potentitally modified by malicious kernel code. When permission check 
+    fails, either refill the cache or terminate offending protection domain.
+* Tag exception triggers monitor mode, uses dedicated registers, disables
+    device interrupts, the MMU and tag checks. 
+
+5.1 Loki prototype - Main goal is to reduce trusted code base for added security!
+* P-cache has 32 entries, 2-way set associative.
+
+5.2 Trusted code base
+* Trusted code base reduced in LoStar by more than a factor of two compared
+    to HiStar!
+
+5.3 Performance
+* Page-level tags significantly improve performance. Newly allocated pages
+    freed pages set the page tag instead of setting each word tag 
+    individually.
+
+
+
+== SUMMARY ==
+HiStar = pre-existing OS used, modified to -> LoStar, both refer to kernel, software and user space
+Loki = the architecture in its whole, LoStar + the hardware aka a modified SPARC processor
+Tags: hardware-level, Loki feature
+Labels: kernel-level, HiStar/LoStar feature
+security monitor in Loki maps labels with tags, 
+tags <-> security monitor <-> labels
+
+* physical memory is tagged, a security monitor that runs underneath the
+    kernel manages the tags. Tags allow specifying specific security policies 
+    unambiguously at hardware level with a very small trusted code base.
+* High and low security divide. We keep compatibility with standard UNIX
+    applications. For LoStar apps, two different sets of low data need
+    to be compromised, in order for secret bits to be able to be accessed by
+    apps not supposed to access them, kernel compromisation achieves nothing because
+    tagged memory is in hardware level. Kernel is only vulnerable to
+    denial-of-service attacks, not data corruption.
+* Every 32-bit word has a 32-bit tag associated with it. Tag checks happen
+    on the processor on every instruction fetch, load, store. Kernel cannot
+    modify tags itself! It calls upon the security monitor!
+* There is a separate data category for every process and only threads in 
+    that process can access the process's address space.
+* Kernel is responsible to prohibit malicious code from exporting secret
+    data outside the system. There is a separate logical instance of a 
+    kernel for each thread. The security monitor protects each kernel 
+    instance from each other with labels. Compromising a kernel instance
+    has minimal consequences compared to a global kernel.
+* Traditional CPU exceptions and tag exceptions. Tag exceptions put the 
+    cpu in monitor mode. the tag exception handler
+    needs to implement its own traditional exception handlers, but they 
+    don't need to be any different than the non-monitor mode ones.
+* Tags are associated with physical (not virtual) memory addresses! Tags are
+    stored in shadow pages, where every 32-bit tag corresponds to a 32-bit
+    word in the original page, and the 32-bit addresses of the shadow pages 
+    are stored in the linear page-tag array. This array is indexed by the
+    page numbers. Page-level tags significantly improve performance. Newly 
+    allocated pages and freed pages set the page tag instead of setting each 
+    word tag individually.
+* Monitor mode is when the processor is modifying tags and verifying that a 
+    process' tag matches the tag of the memory it wants to access (also 
+    modifies and checks gates but I've haven't mentioned them so shhh)
+
+
+
+
