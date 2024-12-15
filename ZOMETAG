@@ -37,8 +37,6 @@
 * ZOMETAG is based on ARM MTE's imprecise mode.
 
 
-
-
 *** III. Threat Model And Assumptions ***
 
 * ZOMETAG provides spatial safety at the granularity of objects, it ingnores
@@ -46,5 +44,84 @@
     and hammering are not considered)
 
 
+*** IV. Design ***
+
+A. Zone-Based Isolation At A Glance
+
+* When a pointer whose referent has been already defined is assigned a new 
+    address, ZOMETAG first makes sure the new address is within the zone of the
+    referent. Then MTE makes sure that only addresses with the same tag can be
+    referenced.
+
+* Heap, stack and global variables are all stored in blue zones only. A blue 
+    zone can max contain 16 different objects, so that every object has a 
+    unique tag!
+
+* The max value we can add to a pointer is the zone length, thus we the new
+    address of the pointer will reside either in the same blue zone with the 
+    previous value, or in the next red zone, in which case we can easily 
+    detect the memory violation.
 
 
+B. Zone Constructions and Object Allocations
+
+* Object allocation to blue zone restrictions: 
+    C1: Max number of objects in zone is 16
+    C2: Max zone size is 4GB.
+    For heap objects, if malloc() cannot find a suitable zone, it exits with
+    an error code (probably means heap memory is close to being full)
+
+
+* The stack is a bit more complicated. We divide it to Safe Stack (that 
+    stores simple integer variables) and Unsafe Stack (stores arrays). In the
+    Safe Stack, zone-based isolation is not implemented. In the Unsafe 
+    Stack, we extend it with blue zones as needed.
+
+* Unsafe Stack objects actually have a dynamic locations! ZOMETAG allocator
+    provides each array with a pointer to its address, but stores it in the
+    Safe Stack (??? how is that not a memory violation smh...)
+
+* Global variables' position, like Safe Stack variables, are determined at 
+    compile time and excempt from zone-based addressing. 
+
+
+C. Zone-based isolation
+
+* A pointer can never reach far enough to point in the next blue zone, it 
+    can only point to the next red zone, in which case we need only check
+    the 32nd bit of the output pointer value to determine whether a spatial
+    memory violation has occured. 
+
+* Optimize calculation overhead by removing redundant checks in pointer
+    operation followed by load/store operations.
+
+D. Multithreading
+
+* Stack and global variables no prob. For heap objects, mutex locks by 
+    the heap allocator. Potential future feature for efficiency, thread-local
+    zones?
+
+
+*** V. Implementation ***
+
+* Actually each zone has max 14 objects, tag 0 is for red zones (and pointers 
+    that have access to everywhere in memory), tag 15 is not
+    used due to a performance issue (???)
+
+Doesn't using only 32-bit registers make this architecture 32-bit instead of
+64 bits?
+
+
+*** VI. Evaluation ***
+
+* ZOMETAG mostly has a better performance overhead, but a worse memory overhead
+    compared to competing solutions. Struggles most in programs with very many
+    live objects.
+
+* Succesfully thwarts attacks by manipulating pointer data.
+
+*** VII. Discussion ***
+
+* Maximum object size (4 GB) and maximum object number (14 x 2^15 = 458,752 
+    objects) per zone limitations means that 
+    ZOMETAG can run most real-world  applications, but not all of them.
