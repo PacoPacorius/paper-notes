@@ -1,0 +1,82 @@
+▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊
+▊▊ Parallel Tag Cache for Multi-core Processors ▊▊
+▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊▊
+
+*** I. Introduction ***
+
+* Tag cache between LLC and memory significantly reduces tag read/write 
+    overhead in single-processor systems. Crucial for hardware-managed 
+    tagged memory. A parallel TC supporting multi-core processors has 
+    not yet been designed however
+
+* We don't want sequential tag access. HTTs corrupt the filesystem in 
+    multicore tag cache systems. We still want to use a hierarchical
+    tag table for efficiency.
+
+
+*** II. Related Work *** (aka existing tag cache architectures)
+
+* Split tag caching: store tags in an array separate from data,
+    allows for better compression (since most data is untagged or tagged zero
+    anyway), but tougher to maintain data consistency. Data consistency issue
+    is accentuated in multicore systems!
+
+* Merged tag caching: store tags along with data. Most commonly used.
+    Double the memory traffic!
+
+* Solution: use tag cache between LLC and memory! But tag caches become too 
+    big! 
+
+* Solution 2: hardware assisted data flow isolation (HDFI). 8MB tag table and
+    128kB meta tag table. 1 bit from the mtt associates with 64B of the tt, 
+    if it is 0, the 64B are empty, don't store them. This saves a considerable
+    amount of space! Save both tables in an updated CHERI uniform 2kB cache,
+    still sequential cache though! Boooo!!
+
+
+*** III. Storing and Caching Tags Using HTTs *** (HTT architecture overview)
+
+Hierarchical Tag Tables are a compression scheme.
+
+A. Layout in Memory: Hierarchical Tag Table
+
+* Example:
+1GB total memory
+64-bit word corresponds to 2-bit tag
+3-level HTT
+
+Inside main memory, create 1024 * (2/64) = 32MB tag partition. 31MB are enough
+to store all the tags. Tags are stored in a tag table with 2-byte width entries.
+Every entry corresponds to 64B of data. Linear mapping between data and its 
+tags. 
+
+Remaining 1MB? Each bit of tag map 0 correspond to a tag table node that are 
+g-bits wide (here, 512 bits). TM0 is 32*1024 / 512 = 64kB wide. 
+
+Tag map 1 does the same to tag map 0 in turn, this needs only 
+62*1024 / 512 = 124B.
+
+* Whenever a TM0 bit is 0, the corresponding 64-bit tag word is either 0 or
+    uninitialized, same goes for TM1 and TM0.
+
+* This allows us to not store redundant 0s in the tag cache (since most tags
+    will either be 0 or unused anyway), thus we achieve a compression scheme
+    with 0 memory overhead.
+
+B. Layout In Cache: Uniformed Tag Cache
+
+* Do we use uniform or separate tag cache?
+
+* Separate achieves best memory utilization when we know a-priori the 
+    temporal and spatial locality of our applications but is bad for 
+    generic processors.
+
+* Uniform cache allows us to dynamically resize the occupied cache space.
+    We are forced to use the same block size for all TT, TM0 and TM1.
+    Our optimal g is also equal to our cache block size.
+
+C. Overall Structure Of Proposed TC
+
+* A LLC memory access requires a whole transaction of tag cache accesses
+    (at least, if we access the HTT top-down, from TM1 to TT). A parallel
+    cache needs every transaction to happen atomically.
