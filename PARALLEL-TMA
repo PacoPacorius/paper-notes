@@ -80,3 +80,26 @@ C. Overall Structure Of Proposed TC
 * A LLC memory access requires a whole transaction of tag cache accesses
     (at least, if we access the HTT top-down, from TM1 to TT). A parallel
     cache needs every transaction to happen atomically.
+
+
+*** IV. Further Improvement Of Efficiency ***
+
+A. Avoid Redundant Store
+* When a dirty cache block is written in memory, the attached tags may be 
+    clean. Most LLC accesses are like this. Enforce read-before-write for
+    all tag write accesses, improving performance and minimizing concurrency
+    issues (blocking on conflicting tag accesses mostly).
+     
+
+B. Avoid Empty Access
+* The TC can invalidate cache blocks when they become empty and create 
+    empty cache blocks without fetching them from memory (???)
+
+
+C. Search Order
+* If we have mostly empty tag blocks, the top-down search order is best.
+    However, if most of our tag blocks are non-empty, it would be better 
+    to search bottom-up, starting from the TT.
+
+D. Dynamically Select Search Order At Runtime
+
