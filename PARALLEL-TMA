@@ -94,6 +94,8 @@ A. Avoid Redundant Store
 B. Avoid Empty Access
 * The TC can invalidate cache blocks when they become empty and create 
     empty cache blocks without fetching them from memory (???)
+    Ideally we only store top-level blocks and non-top-level non-empty blocks
+    in cache.
 
 
 C. Search Order
@@ -101,5 +103,94 @@ C. Search Order
     However, if most of our tag blocks are non-empty, it would be better 
     to search bottom-up, starting from the TT.
 
-D. Dynamically Select Search Order At Runtime
 
+D. Dynamically Select Search Order At Runtime
+* We can dynamically change our search order depending on which level 
+    (TT, TM0 or TM1) tag cache accesses are finally served. Optimal order
+    for previous period is likely optimal for current period as well.
+
+
+*** V. Maintaining data consistency ***
+
+A. Data Consistency Issues (assuming naive parallel serving of tag cache accesses)
+* Two main concurrency issues:
+    a. a stale block is fetched from memory due to a late removal of a tag 
+    map bit.
+    b. double creation of a block due to an early initiation of a tag map bit.
+
+
+B. Two-Phase Locking
+* a. potentially updated blocks locked top-down - lock phase
+    b. said blocks are written to and unlocked bottom-up  - unlock phase
+    This scheme guarantees no cyclic dependencies, once a tag cache access
+    unlocks one block, it cannot lock any more!
+
+* Guarantees consistency, but it is not deadlock-free!
+
+
+C. Reasoning for two-tier tracker system
+
+* Each LLC mem access is handled by TagXact tracker which then offloads it to
+    multiple TCAcc trackers.Each TCAcc tracker is mapped to a bank of cache 
+    sets, becomes serialization point. This covers deadlock corner case of
+    two cache accesses requesting write access on the same cycle!
+
+
+*** VI. Hardware Design ***
+
+* TCAcc each have a vector of lock registers. Optimal number is 
+    2*no. of TCAcc trackers. Lock granularity is a single bit to boost 
+    parallel cache accesses and minimize blocks.
+
+
+*** VII. Performance Evaluation ***
+
+Single-core tests were done on FPGA board
+Multi-core tests were done using RTL simulation
+
+
+A. Description of tag use cases
+1. Ability to tag call/return instructions -- a rare feature in similar
+    designs. It can be used to thwart direct code injection, derive data
+    tags and raise precise exceptions for control-flow checking
+
+2. Tag return addresses on the stack
+
+3. Tag live data on the heap
+    used to detect some forms of use-after-free attacks
+
+
+B. Single-core evaluation
+* Using a dynamic search order shows sub-optimal CPI! Optimal CPI achieved for
+    bottom-up search order. Synamic search order fails to follow memory 
+    access pattern changes!
+
+* CPI and TC accesses per kilo instructions (PKI) for (almost) all benchmarks 
+    (except 433.milc)
+
+
+C. Multi-core evaluation
+* Dynamic search order always chooses the optimal search order when it comes 
+    to CPI in this case.
+
+* CPI and TC accesses PKI reduction, just like single-core, but only in 
+    the general case! If multiple HTT-inefficient benchmarks are running
+    at the same time, CPI and TC accesses PKI are increased! Probably a
+    good idea to dynamically disable HTT in this case.
+
+* Using more trackers significantly impacts CPI overhead. More TagXact and 
+    TCAcc trackers can be used to mitigate the performance overhead of the
+    above abnormal case (mem accesses stay the same).
+
+
+D. Comparing with existing TCs
+* Much fewer mem accesses than CHERI-like equivalent on a single core. Main
+    reason the avoidance of redundant store and empty access. HTT level 
+    doesn't matter for a dynamic search order, this is against CHERI's 
+    suggestion. 
+
+* On multi-core, same amount of memory accesses, but CHERI has a much bigger 
+    CPI overhead. 
+
+* Less memory accesses than HDFI too! Main reason is HDFI's statically
+    allocated cache space...
